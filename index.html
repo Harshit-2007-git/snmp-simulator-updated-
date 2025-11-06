@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SNMP Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #e5e7eb; /* text-gray-200 */
+    }
+    #log-output::-webkit-scrollbar { width: 8px; }
+    #log-output::-webkit-scrollbar-track { background: #1f2937; }
+    #log-output::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    #log-output::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --- Animations --- */
+    @keyframes vibrate {
+      0% { transform: translate(0); }
+      20% { transform: translate(-2px, 2px); }
+      40% { transform: translate(-2px, -2px); }
+      60% { transform: translate(2px, 2px); }
+      80% { transform: translate(2px, -2px); }
+      100% { transform: translate(0); }
+    }
+    .vibrate { animation: vibrate 0.3s linear 2; /* Run animation twice */ }
+
+    /* --- Modal Styles --- */
+    .modal-backdrop { transition: opacity 0.3s ease-in-out; }
+    .modal-content { transition: transform 0.3s ease-in-out; max-height: 80vh; }
+  </style>
+</head>
+<body class="bg-black text-gray-100 min-h-screen p-4 sm:p-8">
+
+  <div class="max-w-7xl mx-auto mb-4 flex justify-end gap-3">
+    <button id="learn-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md">Learn</button>
+    <button id="developed-by-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md">Developed by</button>
+    <button id="download-log-btn" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md">Download</button>
+    <button id="help-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md">Help</button>
+  </div>
+
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold text-center mb-8 text-blue-400">SNMP Simulator</h1>
+
+    <div class="flex flex-col lg:flex-row gap-8">
+
+      <div class="lg:w-1/3 bg-gray-900 p-6 rounded-lg shadow-xl space-y-8">
+
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-blue-300 border-b border-gray-700 pb-2">1. Device Setup</h2>
+
+          <div>
+            <label for="device-type-select" class="block text-sm font-medium text-gray-300">Device Type</label>
+            <select id="device-type-select" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+              <option>PC</option>
+              <option>Laptop</option>
+              <option>Switch</option>
+              <option>Router</option>
+              <option>Hub</option>
+              <option>Firewall</option>
+              <option>Bridge</option>
+              <option>Modem</option>
+              <option>Repeater</option>
+              <option>VPN concentrator</option>
+              <option>Access point</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="device-count-input" class="block text-sm font-medium text-gray-300">Quantity</label>
+            <input type="number" id="device-count-input" value="1" min="1" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+
+          <button id="add-device-btn" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md">Add to List</button>
+
+          <div id="device-list-container" class="space-y-2 max-h-40 overflow-y-auto p-2 bg-gray-800 rounded-md border border-gray-700">
+            <p class="text-gray-400 italic text-sm text-center">Device list is empty...</p>
+          </div>
+
+          <div>
+            <label for="manager-ip" class="block text-sm font-medium text-gray-300">Manager IP</label>
+            <input type="text" id="manager-ip" value="192.168.1.1" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+
+          <div>
+            <label for="agent-prefix" class="block text-sm font-medium text-gray-300">Agent IP Prefix</label>
+            <input type="text" id="agent-prefix" value="192.168.1." class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+
+          <button id="start-sim-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md">Start Simulation</button>
+        </div>
+
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-blue-300 border-b border-gray-700 pb-2">2. Polling Configuration</h2>
+          <div>
+            <label for="oids-to-poll" class="block text-sm font-medium text-gray-300">OIDs to Poll (one per line)</label>
+            <textarea id="oids-to-poll" rows="4" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">1.3.6.1.2.1.1.1.0
+1.3.6.1.2.1.1.3.0
+1.3.6.1.2.1.2.2.1.8.1
+1.3.6.1.2.1.2.2.1.8.2</textarea>
+          </div>
+
+          <div>
+            <label for="poll-interval" class="block text-sm font-medium text-gray-300">Polling Interval (ms)</label>
+            <input type="number" id="poll-interval" value="5000" min="500" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+
+          <div>
+            <label for="net-delay" class="block text-sm font-medium text-gray-300">Network Delay (ms)</label>
+            <input type="number" id="net-delay" value="150" min="0" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+
+          <button id="start-poll-btn" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md" disabled>Start Polling</button>
+          <button id="stop-poll-btn" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md" disabled>Stop Polling</button>
+        </div>
+
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold text-blue-300 border-b border-gray-700 pb-2">3. Manual SET Operation</h2>
+          <div>
+            <label for="set-ip" class="block text-sm font-medium text-gray-300">Device IP</label>
+            <input type="text" id="set-ip" placeholder="e.g., 192.168.1.101" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+          <div>
+            <label for="set-oid" class="block text-sm font-medium text-gray-300">OID to SET</label>
+            <input type="text" id="set-oid" value="1.3.6.1.2.1.1.5.0" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+          <div>
+            <label for="set-value" class="block text-sm font-medium text-gray-300">New Value</label>
+            <input type="text" id="set-value" placeholder="e.g., 'new-router-name'" class="mt-1 block w-full bg-gray-800 border-gray-700 rounded-md shadow-sm p-2 text-gray-100 focus:ring-blue-400 focus:border-blue-400">
+          </div>
+
+          <button id="send-set-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md" disabled>Send SET Request</button>
+        </div>
+      </div>
+
+      <div class="lg:w-2/3 space-y-8">
+        <div>
+          <h2 class="text-2xl font-semibold text-blue-300 mb-4">Network Map</h2>
+          <div id="network-map" class="bg-gray-900 p-6 rounded-lg shadow-xl flex items-center justify-center min-h-[400px] relative">
+            <div id="map-manager" class="transition-all duration-150 z-10"></div>
+            <div id="map-agents-container" class="absolute top-0 left-0 w-full h-full">
+              <div class="text-gray-400 italic absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                Add devices and press "Start Simulation" to create them.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-2xl font-semibold text-blue-300 mb-4">Device Status</h2>
+          <div id="device-status-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div class="text-gray-400 italic">Add devices and press "Start Simulation" to create them.</div>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-2xl font-semibold text-blue-300 mb-4">SNMP Log</h2>
+          <pre id="log-output" class="w-full h-96 bg-gray-800 text-sm text-gray-100 rounded-lg shadow-inner p-4 overflow-y-scroll font-mono"></pre>
+          <div class="flex gap-4 mt-4">
+            <button id="clear-log-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md">Clear Log</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="help-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="modal-backdrop absolute inset-0 bg-black bg-opacity-75" data-close-modal="help-modal"></div>
+    <div class="modal-content bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl transform scale-95 z-10 p-6 overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+        <h2 class="text-2xl font-semibold text-blue-300">Help - How to Use the Simulator</h2>
+        <button data-close-modal="help-modal" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+      </div>
+      <div class="space-y-4 text-gray-300">
+        <p>This simulator demonstrates the core concepts of SNMP (Simple Network Management Protocol). Here's the correct flow to use it:</p>
+
+        <h3 class="text-xl font-semibold text-blue-300">1. Start the Simulation</h3>
+        <ul class="list-disc list-inside space-y-2 pl-4">
+          <li><strong>Device Setup:</strong> Select a device type (Router, Switch, etc.) and a quantity. Click "Add to List". Repeat this for all device types you want.</li>
+          <li>You can remove devices from the list by clicking the 'X' next to them.</li>
+          <li><strong>Manager IP:</strong> Set the IP address for the central Network Manager (e.g., 192.168.1.1).</li>
+          <li><strong>Agent IP Prefix:</strong> Set the base IP for your devices (e.g., 192.168.1.). The simulator will create devices with IPs like 192.168.1.101, 192.168.1.102, etc.</li>
+          <li>Click <strong>"Start Simulation"</strong>. You will see the devices appear on the Network Map and in the Device Status grid.</li>
+        </ul>
+
+        <h3 class="text-xl font-semibold text-blue-300">2. Start Polling (GET Requests)</h3>
+        <ul class="list-disc list-inside space-y-2 pl-4">
+          <li><strong>OIDs to Poll:</strong> These are the "questions" the manager will ask each device. The defaults check for system description, uptime, and port status.</li>
+          <li><strong>Polling Interval:</strong> How often to ask (in milliseconds). 5000ms = 5 seconds.</li>
+          <li><strong>Network Delay:</strong> Simulates network lag for requests and responses.</li>
+          <li>Click <strong>"Start Polling"</strong>. Watch the "SNMP Log" - you'll see [GET] requests going from the Manager to the agents and [GET-RESPONSE] replies coming back. The Network Map will flash blue for each poll.</li>
+        </ul>
+
+        <h3 class="text-xl font-semibold text-blue-300">3. Interpret the Results</h3>
+        <ul class="list-disc list-inside space-y-2 pl-4">
+          <li><strong>SNMP Log:</strong> This is the main output.
+            <ul>
+              <li><span class="text-blue-400">[GET]</span>: The manager asking for data.</li>
+              <li><span class="text-yellow-400">[SET]</span>: The manager telling a device to change something.</li>
+              <li><span class="text-red-400">[TRAP]</span>: A device automatically reporting an important event (like a port going down). The map node will turn red and vibrate.</li>
+            </ul>
+          </li>
+          <li><strong>Network Map:</strong>
+            <ul>
+              <li><strong>Blue Flash:</strong> A device is being polled (GET/SET).</li>
+              <li><strong>Red Node:</strong> A device has sent a TRAP (an alert). It resets to its normal color (blue/green) on the next successful poll.</li>
+            </ul>
+          </li>
+          <li><strong>Device Status:</strong> You can click on any device in this grid to print its entire MIB (its database of information) to the log.</li>
+        </ul>
+
+        <h3 class="text-xl font-semibold text-blue-300">4. Send a Manual SET Request</h3>
+        <ul class="list-disc list-inside space-y-2 pl-4">
+          <li>This lets you manually change data on a device.</li>
+          <li><strong>Device IP:</strong> Enter the *exact* IP of a device (e.g., 192.168.1.101).</li>
+          <li><strong>OID to SET:</strong> Enter an OID that is writable. Try <code>1.3.6.1.2.1.1.5.0</code> (the device name).</li>
+          <li><strong>New Value:</strong> Enter the new name (e.g., "Main-Router-Floor1").</li>
+          <li>Click <strong>"Send SET Request"</strong>. You'll see the [SET] request and [SET-RESPONSE] in the log. The map will flash yellow.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Learn Modal -->
+  <div id="learn-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="modal-backdrop absolute inset-0 bg-black bg-opacity-75" data-close-modal="learn-modal"></div>
+    <div class="modal-content bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl transform scale-95 z-10 p-6 overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+        <h2 class="text-2xl font-semibold text-blue-300">Project Learning Center</h2>
+        <button data-close-modal="learn-modal" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+      </div>
+      <div class="space-y-6 text-gray-300">
+
+        <div>
+          <h3 class="text-xl font-semibold text-blue-300 mb-2">How We Built This Project</h3>
+          <p>This project is a lightweight, front-end-only network simulator built with pure <strong>HTML, JavaScript, and Tailwind CSS</strong>. It runs entirely in your browser without any backend server.</p>
+          <ul class="list-disc list-inside space-y-1 pl-4 mt-2">
+            <li><strong>JavaScript Classes:</strong> A <code>Device</code> class is used to create simulated device objects. Each object maintains its own "MIB" (a JavaScript <code>Map</code> or <code>Object</code>) to store data.</li>
+            <li><strong>Event-Driven Logic:</strong> All actions are triggered by button clicks. <code>setInterval</code> is used for the "Start Polling" loop. <code>setTimeout</code> is used to simulate network latency.</li>
+            <li><strong>DOM Manipulation:</strong> The Network Map, Device Grid, and SNMP Log are all dynamically generated by JavaScript functions that create, add, and remove HTML elements.</li>
+            <li><strong>CSS Animations:</strong> The flashing and vibrating effects on the map are done with CSS <code>@keyframes</code> and by dynamically adding/removing CSS classes with JavaScript.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="text-xl font-semibold text-blue-300 mb-2">Materials </h3>
+
+          <h4 class="text-lg font-semibold text-blue-200 mt-3 mb-1 pl-4">Core Components</h4>
+          <ul class="list-disc list-inside space-y-1 pl-8">
+            <li><strong>SNMP Manager:</strong> The monitoring system (like this webpage) that sends requests to agents. It's the "client" side of the protocol, responsible for polling devices and receiving traps.</li>
+            <li><strong>SNMP Agent:</strong> Software that runs on a managed device (like a router, switch, or PC). It listens for requests from the manager, retrieves the requested information from the MIB, and sends it back. It's the "server" side.</li>
+            <li><strong>Community String:</strong> A simple password used in SNMPv1 and SNMPv2c to authenticate requests between the manager and agent. Common defaults (like "public" for read-only) are a major security risk.</li>
+          </ul>
+
+          <h4 class="text-lg font-semibold text-blue-200 mt-4 mb-1 pl-4">Structure of Management Information (SMI)</h4>
+          <ul class="list-disc list-inside space-y-1 pl-8">
+            <li>The SMI is the "rulebook" or grammar for defining MIBs. It specifies the data types, object models, and how MIBs should be written.</li>
+            <li>It uses a subset of a formal language called <strong>ASN.1 (Abstract Syntax Notation One)</strong> to define data.</li>
+            <li><strong>Common Data Types:</strong>
+              <ul class="list-disc list-inside space-y-1 pl-8 mt-1">
+                <li><strong>INTEGER:</strong> A whole number (e.g., for counting packets).</li>
+                <li><strong>OCTET STRING:</strong> A sequence of bytes, used for text (like <code>sysDescr</code>) or binary data.</li>
+                <li><strong>OBJECT IDENTIFIER:</strong> The OID data type itself, used to point to other OIDs.</li>
+                <li><strong>Counter:</strong> A non-negative integer that only increases until it wraps (e.g., <code>ifInOctets</code> - total bytes in).</li>
+                <li><strong>Gauge:</strong> A non-negative integer that can go up or down (e.g., <code>ifSpeed</code> - interface speed).</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4 class="text-lg font-semibold text-blue-200 mt-4 mb-1 pl-4">Management Information Base (MIB)</h4>
+          <ul class="list-disc list-inside space-y-1 pl-8">
+            <li>A MIB is a hierarchical database of information on an agent, defined using the SMI. It's not the data itself, but the <em>definition</em> of the data.</li>
+            <li>It is structured as a <strong>tree</strong>. The top of the tree is an unnamed root, with branches for different organizations.</li>
+            <li>The path <code>1.3.6.1</code> is the standard prefix for most network management OIDs.
+              <ul class="list-disc list-inside space-y-1 pl-8 mt-1">
+                <li><strong>1:</strong> iso (International Organization for Standardization)</li>
+                <li><strong>3:</strong> org (Organizations)</li>
+                <li><strong>6:</strong> dod (U.S. Department of Defense)</li>
+                <li><strong>1:</strong> internet (The Internet)</li>
+              </ul>
+            </li>
+            <li>From <code>internet</code> (<code>1.3.6.1</code>), it branches further into <code>mgmt</code> (<code>2</code>), <code>private</code> (<code>4</code>), and more. <code>mib-2</code> (<code>1.3.6.1.2.1</code>) is where standard system info lives.</li>
+          </ul>
+
+          <h4 class="text-lg font-semibold text-blue-200 mt-4 mb-1 pl-4">Object Identifier (OID)</h4>
+          <ul class="list-disc list-inside space-y-1 pl-8">
+            <li>A unique, dot-separated address for a specific variable (a "leaf") in the MIB tree.</li>
+            <li>For example, <code>1.3.6.1.2.1.1.1.0</code> is the OID for <code>sysDescr.0</code>:
+              <ul class="list-disc list-inside space-y-1 pl-8 mt-1">
+                <li><code>1.3.6.1.2.1</code>: <code>mib-2</code></li>
+                <li><code>1</code>: <code>system</code> group</li>
+                <li><code>1</code>: <code>sysDescr</code> (System Description)</li>
+                <li><code>0</code>: The instance identifier. For "scalar" objects (which have only one instance), this is always <code>.0</code>. For "tabular" objects (like an interface table), this number would be an index (e.g., <code>.1</code>, <code>.2</code>) for each row.</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4 class="text-lg font-semibold text-blue-200 mt-4 mb-1 pl-4">SNMP Protocol Data Units (PDUs)</h4>
+          <p class="pl-8">These are the actual commands used in an SNMP message:</p>
+          <ul class="list-disc list-inside space-y-1 pl-8">
+            <li><strong>GetRequest:</strong> Sent by the Manager to an Agent to request the value of one or more OIDs. (Simulated by "Start Polling").</li>
+            <li><strong>GetNextRequest:</strong> Asks for the value of the <em>next</em> OID in the MIB tree. This is used to "walk" the MIB and discover all available data without knowing every OID in advance.</li>
+            <li><strong>GetBulkRequest (v2c/v3):</strong> An enhancement of GetNext that allows a manager to retrieve a large block of data (e.g., a whole table) in a single request, which is much more efficient.</li>
+            <li><strong>SetRequest:</strong> Sent by the Manager to an Agent to <em>change</em> the value of a writable OID. (Simulated by the "Manual SET" section).</li>
+            <li><strong>GetResponse:</strong> Sent by the Agent back to the Manager in response to Get, GetNext, GetBulk, or Set requests.</li>
+            <li><strong>Trap (v1):</strong> An unsolicited (asynchronous) message sent from an Agent <em>to</em> the Manager to report an important event (e.g., port down, device reboot). It is unconfirmed.</li>
+            <li><strong>Trap (v2c/v3) / InformRequest:</strong> v2c/v3 Traps are slightly different, and there is also an <code>InformRequest</code>, which is a <em>confirmed</em> trap. The manager must send a GetResponse to acknowledge it, ensuring the message was received.</li>
+          </ul>
+
+          <p class="mt-6 pt-4 border-t border-gray-700 text-sm text-gray-400 italic">
+            Material adapted from: Mauro, Douglas R., and Kevin J. Schmidt. <strong>Essential SNMP, 2nd Edition</strong>. O'Reilly Media, 2005.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="text-xl font-semibold text-blue-300 mb-2">Reference Video</h3>
+          <p>An overview of the SNMP protocol.</p>
+          <div class="aspect-w-16 aspect-h-9 bg-gray-800 rounded-lg mt-2">
+            <iframe width="100%" height="315" src="https://www.youtube.com/embed/Keyf_P_hF3A"
+              title="YouTube video player" frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen class="rounded-lg"></iframe>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xl font-semibold text-blue-300 mb-2">References</h3>
+          <ul class="list-disc list-inside space-y-1 pl-4 text-sm">
+            <li><a href="https://docs.lextudio.com/snmpsim/" target="_blank" class="text-blue-400 hover:underline">SNMP Simulator Documentation</a></li>
+            <li><a href="https://www.easysnmp.com/downloads/easysnmp-fundamentals-second-edition.pdf" target="_blank" class="text-blue-400 hover:underline">EasySNMP Fundamentals (PDF)</a></li>
+            <li><a href="https://tailwindcss.com/" target="_blank" class="text-blue-400 hover:underline">Tailwind CSS Documentation</a></li>
+            <li><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank" class="text-blue-400 hover:underline">MDN Web Docs (JavaScript)</a></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Developed By Modal -->
+  <div id="developed-by-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="modal-backdrop absolute inset-0 bg-black bg-opacity-75" data-close-modal="developed-by-modal"></div>
+    <div class="modal-content bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl transform scale-95 z-10 p-6 overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+        <h2 class="text-2xl font-semibold text-blue-300">Developed By</h2>
+        <button data-close-modal="developed-by-modal" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+          <img id="photo-harshit" src="images/harshit.jpg" alt="Photo of Harshit Tiwari"
+               class="w-32 h-32 rounded-full mx-auto mb-3 bg-gray-700 object-cover border-2 border-blue-400"
+               onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2EwYTBiYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgM3MtMS4zNCAzLTMgMy0zLTEuMzQtMy0zIDEuMzQtMyAzLTN6bTAgMTRjLTIuNjcgMC01LjAxLTEuNDQtNi4zMy0zLjY5QzcuNTYgMTMuODEgOS42OCAxMyAxMiAxM3MyLjQ0LjgyIDQuMzMgMi4zMUMxNy4wMSA5LjU2IDE0LjY3IDE5IDEyIDE5eiIvPjwvc3ZnPg=='; this.onerror=null;">
+          <h3 class="text-xl font-semibold text-white">Harshit Tiwari</h3>
+          <p class="text-blue-300">24BCE1363</p>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+          <img id="photo-nityanshu" src="images/nityanshu.jpg" alt="Photo of Nityanshu Tripathi"
+               class="w-32 h-32 rounded-full mx-auto mb-3 bg-gray-700 object-cover border-2 border-blue-400"
+               onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2EwYTBiYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi44OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgM3MtMS4zNCAzLTMgMy0zLTEuMzQtMy0zIDEuMzQtMyAzLTN6bTAgMTRjLTIuNjcgMC01LjAxLTEuNDQtNi4zMy0zLjY5QzcuNTYgMTMuODEgOS42OCAxMyAxMiAxM3MyLjQ0LjgyIDQuMzMgMi4zMUMxNy4wMSA5LjU2IDE0LjY3IDE5IDEyIDE5eiIvPjwvc3ZnPg=='; this.onerror=null;">
+          <h3 class="text-xl font-semibold text-white">Nityanshu Tripathi</h3>
+          <p class="text-blue-300">24BCE1340</p>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+          <img id="photo-kushagra" src="images/kushagra.jpg" alt="Photo of Kushagra Shrivastava"
+               class="w-32 h-32 rounded-full mx-auto mb-3 bg-gray-700 object-cover border-2 border-blue-400"
+               onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2EwYTBiYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi44OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgM3MtMS4zNCAzLTMgMy0zLTEuMzQtMy0zIDEuMzQtMyAzLTN6bTAgMTRjLTIuNjcgMC01LjExLTEuNDQtNi4zMy0zLjY5QzcuNTYgMTMuODEgOS42OCAxMyAxMiAxM3MyLjQ0LjgyIDQuMzMgMi4zMUMxNy4wMSA5LjU2IDE0LjY3IDE5IDEyIDE5eiIvPjwvc3ZnPg=='; this.onerror=null;">
+          <h3 class="text-xl font-semibold text-white">Kushagra Shrivastava</h3>
+          <p class="text-blue-300">24BCE1344</p>
+        </div>
+
+        <h3 class="text-xl font-semibold text-blue-300 mb-4 text-center md:col-span-3 mt-8">Guided by</h3>
+        <div class="md:col-span-3 flex justify-center">
+          <div class="bg-gray-800 p-4 rounded-lg shadow-lg w-full max-w-xs">
+            <img id="photo-sir" src="images/sir.jpg" alt="Photo of Dr. Swaminathan Annadurai"
+                 class="w-32 h-32 rounded-full mx-auto mb-3 bg-gray-700 object-cover border-2 border-blue-400"
+                 onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2EwYTBiYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi44OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgM3MtMS4zNCAzLTMgMy0zLTEuMzQtMy0zIDEuMzQtMyAzLTN6bTAgMTRjLTIuNjcgMC01LjAxLTEuNDQtNi4zMy0zLjY5QzcuNTYgMTMuODEgOS42OCAxMyAxMiAxM3MyLjQ0LjgyIDQuMzMgMi4zMUMxNy4wMSA5LjU2IDE0LjY3IDE5IDEyIDE5eiIvPjwvc3ZnPg=='; this.onerror=null;">
+            <h3 class="text-xl font-semibold text-white">Dr. Swaminathan Annadurai</h3>
+            <!-- <p class="text-blue-300">Professor</p> -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Download Modal -->
+  <div id="download-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="modal-backdrop absolute inset-0 bg-black bg-opacity-75" data-close-modal="download-modal"></div>
+    <div class="modal-content bg-gray-900 rounded-lg shadow-xl w-full max-w-md transform scale-95 z-10 p-6 overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+        <h2 class="text-2xl font-semibold text-blue-300">Download Data</h2>
+        <button data-close-modal="download-modal" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+      </div>
+      <div class="space-y-4 text-gray-300">
+        <p>Select which data you would like to download as a .txt file.</p>
+        <button id="download-setup-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md">Download Device Setup</button>
+        <button id="download-full-log-btn" class="w-full bg-green-600 hover:bg-green-500 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md">Download Full Console Log</button>
+        <button id="download-filtered-log-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md">Download Filtered Log (SET/TRAP only)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // =========== MODAL JAVASCRIPT ==============
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      const modalTriggers = {
+        'help-btn': 'help-modal',
+        'learn-btn': 'learn-modal',
+        'developed-by-btn': 'developed-by-modal',
+        'download-log-btn': 'download-modal'
+      };
+
+      const allModals = Array.from(document.querySelectorAll('#help-modal, #learn-modal, #developed-by-modal, #download-modal'));
+
+      const openModal = (modalId) => {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+          const backdrop = modal.querySelector('.modal-backdrop');
+          const content = modal.querySelector('.modal-content');
+          if (backdrop) backdrop.style.opacity = '1';
+          if (content) {
+            content.classList.remove('scale-95');
+            content.classList.add('scale-100');
+          }
+        }, 10);
+      };
+
+      const closeModal = (modalId) => {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        const backdrop = modal.querySelector('.modal-backdrop');
+        const content = modal.querySelector('.modal-content');
+        if (backdrop) backdrop.style.opacity = '0';
+        if (content) {
+          content.classList.remove('scale-100');
+          content.classList.add('scale-95');
+        }
+        setTimeout(() => modal.classList.add('hidden'), 300);
+      };
+
+      for (const [btnId, modalId] of Object.entries(modalTriggers)) {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.addEventListener('click', () => openModal(modalId));
+      }
+
+      allModals.forEach(modal => {
+        modal.querySelectorAll('[data-close-modal]').forEach(element => {
+          element.addEventListener('click', () => {
+            const modalId = element.dataset.closeModal;
+            if (modalId) closeModal(modalId);
+          });
+        });
+        const backdrop = modal.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.addEventListener('click', () => closeModal(modal.id));
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === "Escape") {
+          allModals.forEach(modal => {
+            if (!modal.classList.contains('hidden')) closeModal(modal.id);
+          });
+        }
+      });
+    });
+
+    // ==============================================
+    // =========== ORIGINAL SNMP SIM SCRIPT =========
+    // ==============================================
+    const devices = new Map();
+    let managerIP = '';
+    let pollingIntervalId = null;
+    let deviceSetupList = [];
+
+    // --- Control Panel Elements ---
+    const startSimBtn = document.getElementById('start-sim-btn');
+    const startPollBtn = document.getElementById('start-poll-btn');
+    const stopPollBtn = document.getElementById('stop-poll-btn');
+    const sendSetBtn = document.getElementById('send-set-btn');
+    const clearLogBtn = document.getElementById('clear-log-btn');
+
+    const deviceTypeSelect = document.getElementById('device-type-select');
+    const deviceCountInput = document.getElementById('device-count-input');
+    const addDeviceBtn = document.getElementById('add-device-btn');
+    const deviceListContainer = document.getElementById('device-list-container');
+
+    const managerIpInput = document.getElementById('manager-ip');
+    const agentPrefixInput = document.getElementById('agent-prefix');
+    const oidsTextarea = document.getElementById('oids-to-poll');
+    const pollIntervalInput = document.getElementById('poll-interval');
+    const netDelayInput = document.getElementById('net-delay');
+    const setIpInput = document.getElementById('set-ip');
+    const setOidInput = document.getElementById('set-oid');
+    const setValueInput = document.getElementById('set-value');
+
+    // --- Display Panel Elements ---
+    const deviceGrid = document.getElementById('device-status-grid');
+    const logOutput = document.getElementById('log-output');
+    const networkMap = document.getElementById('network-map');
+    const mapManager = document.getElementById('map-manager');
+    const mapAgentsContainer = document.getElementById('map-agents-container');
+
+    // --- Download Modal Buttons ---
+    const downloadSetupBtn = document.getElementById('download-setup-btn');
+    const downloadFullLogBtn = document.getElementById('download-full-log-btn');
+    const downloadFilteredLogBtn = document.getElementById('download-filtered-log-btn');
+
+    // --- Device Class ---
+    class Device {
+      constructor(ip, type) {
+        this.ip = ip;
+        this.type = type;
+        this.startTime = Date.now();
+        this.mib = this.generateSimulatedMib();
+
+        this.portStatus = {
+          '1.3.6.1.2.1.2.2.1.8.1': 'up',
+          '1.3.6.1.2.1.2.2.1.8.2': 'up'
+        };
+      }
+
+      generateSimulatedMib() {
+        const deviceId = this.ip.split('.').pop();
+        return {
+          '1.3.6.1.2.1.1.1.0': `Simulated ${this.type} v${deviceId}.0`,
+          '1.3.6.1.2.1.1.2.0': '1.3.6.1.4.1.9999',
+          '1.3.6.1.2.1.1.3.0': () => (Date.now() - this.startTime) / 10,
+          '1.3.6.1.2.1.1.5.0': `${this.type.toLowerCase()}-${deviceId}`,
+          '1.3.6.1.2.1.1.6.0': 'Data Center, 1st Floor'
+        };
+      }
+
+      get(oid) {
+        if (this.mib[oid] && typeof this.mib[oid] === 'function') {
+          return Math.floor(this.mib[oid]());
+        }
+
+        if (this.portStatus.hasOwnProperty(oid)) {
+          return this.portStatus[oid];
+        }
+
+        if (this.mib.hasOwnProperty(oid)) {
+          return this.mib[oid];
+        }
+
+        return 'Error: No Such Object';
+      }
+
+      set(oid, value) {
+        const writableOids = ['1.3.6.1.2.1.1.5.0', '1.3.6.1.2.1.1.6.0'];
+
+        if (writableOids.includes(oid)) {
+          this.mib[oid] = value;
+          return 'SET OK';
+        }
+
+        return 'Error: OID is read-only or does not exist';
+      }
+
+      simulateTrap() {
+        if (Math.random() < 0.1) {
+          const portOid = '1.3.6.1.2.1.2.2.1.8.2';
+          const oldStatus = this.portStatus[portOid];
+          const newStatus = oldStatus === 'up' ? 'down' : 'up';
+          this.portStatus[portOid] = newStatus;
+
+          return {
+            type: 'TRAP',
+            source: this.ip,
+            oid: '1.3.6.1.6.3.1.1.5.3',
+            message: `Port 2 (OID: ${portOid}) changed status to ${newStatus}`
+          };
+        }
+        return null;
+      }
+    }
+
+    // --- Logging Function ---
+    function logMessage(type, source, dest, content) {
+      const timestamp = new Date().toISOString();
+      let colorClass = 'text-gray-200';
+
+      if (type.startsWith('GET')) colorClass = 'text-blue-400';
+      if (type.startsWith('SET')) colorClass = 'text-yellow-400';
+      if (type.startsWith('TRAP')) colorClass = 'text-red-400 font-bold';
+      if (type.startsWith('SYSTEM')) colorClass = 'text-green-400 font-bold';
+
+      const logEntry = document.createElement('div');
+      logEntry.innerHTML =
+        `<span class="text-gray-500">[${timestamp}]</span> ` +
+        `<span class="w-24 inline-block ${colorClass}">[${type}]</span> ` +
+        `<span class="text-cyan-400">From:</span> ${source} ` +
+        `<span class="text-cyan-400">To:</span> ${dest} | ` +
+        `<span class="${colorClass}">${content}</span>`;
+
+      logOutput.prepend(logEntry);
+    }
+
+    // --- Network Delay ---
+    function getNetworkDelay() {
+      const delay = parseInt(netDelayInput.value, 10);
+      return isNaN(delay) || delay < 0 ? 0 : delay;
+    }
+
+    // --- Network Map Animation ---
+    function flashMapElement(agentIp, type) {
+      const managerEl = mapManager;
+      const agentEl = document.getElementById(`map-agent-${agentIp}`);
+      if (!agentEl) return;
+
+      const managerBaseClass = mapManager.baseClass || mapManager.className || '';
+      const agentBaseClass = agentEl.baseClass || agentEl.className || '';
+
+      let flashClass = '';
+      let vibrateClass = '';
+
+      switch (type) {
+        case 'get':
+          flashClass = 'bg-blue-500 scale-110';
+          break;
+        case 'set':
+          flashClass = 'bg-yellow-500 scale-110 text-black';
+          break;
+        case 'trap':
+          flashClass = 'bg-red-600 border-red-400';
+          vibrateClass = 'vibrate';
+          break;
+        default:
+          return;
+      }
+
+      const flashDuration = 150;
+
+      if (type === 'get' || type === 'set') {
+        managerEl.className = `${managerBaseClass} ${flashClass}`;
+        setTimeout(() => {
+          managerEl.className = managerBaseClass;
+          agentEl.className = `${agentBaseClass} ${flashClass}`;
+          setTimeout(() => {
+            if (!agentEl.className.includes('bg-red-600')) {
+              agentEl.className = agentBaseClass;
+            }
+          }, flashDuration);
+        }, flashDuration);
+      } else if (type === 'trap') {
+        agentEl.className = `${agentBaseClass} ${flashClass} ${vibrateClass}`;
+        managerEl.className = `${managerBaseClass} bg-red-600 text-white border-red-400 ${vibrateClass}`;
+
+        setTimeout(() => {
+          managerEl.className = managerBaseClass;
+          agentEl.className = `${agentBaseClass} ${flashClass}`;
+        }, 600);
+      }
+    }
+
+    // --- UI Update Functions ---
+    function updateDeviceGrid(device) {
+      const card = document.createElement('div');
+      card.className = 'bg-gray-900 p-3 rounded-lg shadow-md cursor-pointer hover:bg-gray-800 transition duration-150 border border-gray-700';
+      card.innerHTML = `
+        <div class="font-bold text-blue-400">${device.ip}</div>
+        <div class="text-sm text-gray-400">${device.type}</div>
+      `;
+      card.onclick = () => {
+        logMessage('SYSTEM', 'Manager', 'Manager', `--- MIB for ${device.ip} ---`);
+        for (const [oid, value] of Object.entries(device.mib)) {
+          const val = typeof value === 'function' ? Math.floor(value()) : value;
+          logMessage('SYSTEM', 'Manager', 'Manager', `${oid} = ${val}`);
+        }
+        for (const [oid, status] of Object.entries(device.portStatus)) {
+          logMessage('SYSTEM', 'Manager', 'Manager', `${oid} = ${status}`);
+        }
+        logMessage('SYSTEM', 'Manager', 'Manager', `--- End MIB ---`);
+      };
+      deviceGrid.appendChild(card);
+    }
+
+    function updateNetworkMap(device, index, total) {
+      const mapAgentEl = document.createElement('div');
+      const type = device.type;
+
+      let agentTypeClass = 'bg-blue-800 border-blue-500';
+      if (type === 'Switch') agentTypeClass = 'bg-green-800 border-green-500';
+      else if (type === 'PC') agentTypeClass = 'bg-indigo-800 border-indigo-500';
+      else if (type === 'Laptop') agentTypeClass = 'bg-purple-800 border-purple-500';
+      else if (type === 'Firewall') agentTypeClass = 'bg-red-800 border-red-500';
+      else if (type === 'Hub') agentTypeClass = 'bg-gray-700 border-gray-500';
+
+      mapAgentEl.baseClass = `w-20 h-20 rounded-full flex flex-col items-center justify-center text-center shadow-lg transition-all duration-150 border-2 ${agentTypeClass}`;
+      mapAgentEl.className = mapAgentEl.baseClass;
+      mapAgentEl.id = `map-agent-${device.ip}`;
+      mapAgentEl.innerHTML = `
+        <div class="font-semibold text-sm text-gray-100">${device.ip.split('.').pop()}</div>
+        <div class="text-xs text-gray-300">${device.type}</div>
+      `;
+
+      const radius = 160;
+      const angle = (index / total) * 2 * Math.PI - (Math.PI / 2);
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+
+      mapAgentEl.style.position = 'absolute';
+      mapAgentEl.style.top = '50%';
+      mapAgentEl.style.left = '50%';
+      mapAgentEl.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+
+      mapAgentsContainer.appendChild(mapAgentEl);
+    }
+
+    // --- Simulation Logic ---
+    function pollDevice(device, oid) {
+      const agentEl = document.getElementById(`map-agent-${device.ip}`);
+      if (agentEl && agentEl.className !== agentEl.baseClass) {
+        agentEl.className = agentEl.baseClass;
+      }
+
+      const delay = getNetworkDelay();
+      logMessage('GET', managerIP, device.ip, `Query: ${oid}`);
+      flashMapElement(device.ip, 'get');
+
+      setTimeout(() => {
+        const value = device.get(oid);
+        logMessage('GET-RESPONSE', device.ip, managerIP, `OID: ${oid} = ${value}`);
+      }, delay);
+    }
+
+    function startPolling() {
+      if (pollingIntervalId) clearInterval(pollingIntervalId);
+
+      const interval = parseInt(pollIntervalInput.value, 10);
+      if (isNaN(interval) || interval < 500) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Error: Invalid polling interval. Must be >= 500ms.');
+        return;
+      }
+
+      const oidsToPoll = oidsTextarea.value.split('\n').map(o => o.trim()).filter(o => o);
+      if (oidsToPoll.length === 0) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Error: No OIDs specified to poll.');
+        return;
+      }
+
+      logMessage('SYSTEM', 'Manager', 'Manager', `Starting polling every ${interval}ms...`);
+      stopPollBtn.disabled = false;
+      startPollBtn.disabled = true;
+      startPollBtn.innerText = "Polling...";
+
+      pollingIntervalId = setInterval(() => {
+        for (const [ip, device] of devices.entries()) {
+          for (const oid of oidsToPoll) {
+            pollDevice(device, oid);
+          }
+          const trap = device.simulateTrap();
+          if (trap) {
+            logMessage(trap.type, trap.source, managerIP, trap.message);
+            flashMapElement(trap.source, 'trap');
+          }
+        }
+      }, interval);
+    }
+
+    function stopPolling() {
+      if (pollingIntervalId) {
+        clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Polling stopped.');
+        stopPollBtn.disabled = true;
+        startPollBtn.disabled = false;
+        startPollBtn.innerText = "Start Polling";
+      }
+    }
+
+    // --- Device Setup List Management ---
+    function renderDeviceList() {
+      deviceListContainer.innerHTML = '';
+      if (deviceSetupList.length === 0) {
+        deviceListContainer.innerHTML = '<p class="text-gray-400 italic text-sm text-center">Device list is empty...</p>';
+        return;
+      }
+      deviceSetupList.forEach((item, index) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'flex justify-between items-center bg-gray-700 p-2 rounded';
+        itemEl.innerHTML = `
+          <span class="text-gray-100">${item.count} x ${item.type}</span>
+          <button data-index="${index}" class="remove-device-item text-red-400 hover:text-red-300 font-bold px-2">&times;</button>
+        `;
+        deviceListContainer.appendChild(itemEl);
+      });
+
+      document.querySelectorAll('.remove-device-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const indexToRemove = parseInt(e.target.dataset.index, 10);
+          deviceSetupList.splice(indexToRemove, 1);
+          renderDeviceList();
+        });
+      });
+    }
+
+    // --- Download Helper Functions ---
+    function triggerTextDownload(content, filename) {
+      const a = document.createElement('a');
+      const file = new Blob([content], {type: 'text/plain'});
+      a.href = URL.createObjectURL(file);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function downloadDeviceSetup() {
+      if (devices.size === 0) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'No devices to download. Start simulation first.');
+        return;
+      }
+      let content = "SNMP Simulation - Device Setup\n";
+      content += `Manager IP: ${managerIP}\n`;
+      content += "-----------------------------------\n";
+      content += `Total Devices: ${devices.size}\n\n`;
+      devices.forEach(device => {
+        content += `IP: ${device.ip}\nType: ${device.type}\n\n`;
+      });
+      triggerTextDownload(content, 'snmp_device_setup.txt');
+    }
+
+    function downloadLog(filtered = false) {
+      let logContent = logOutput.innerText || '';
+      let filename = 'snmp_full_log.txt';
+      let header = "SNMP Simulation - Full Log\n-----------------------------------\n\n";
+
+      if (filtered) {
+        filename = 'snmp_filtered_log.txt';
+        header = "SNMP Simulation - Filtered Log (SET/TRAP)\n-----------------------------------\n\n";
+        logContent = logContent.split('\n')
+          .filter(line => line.includes('[SET]') || line.includes('[TRAP]'))
+          .join('\n');
+      }
+
+      if (!logContent.trim()) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'No log data to download.');
+        return;
+      }
+
+      triggerTextDownload(header + logContent, filename);
+    }
+
+    // --- Event Listeners ---
+    addDeviceBtn.addEventListener('click', () => {
+      const type = deviceTypeSelect.value;
+      const count = parseInt(deviceCountInput.value, 10);
+      if (isNaN(count) || count <= 0) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Error: Invalid quantity. Must be > 0.');
+        return;
+      }
+
+      const existing = deviceSetupList.find(item => item.type === type);
+      if (existing) {
+        existing.count += count;
+      } else {
+        deviceSetupList.push({ type, count });
+      }
+      renderDeviceList();
+      deviceCountInput.value = '1';
+    });
+
+    startSimBtn.addEventListener('click', () => {
+      const prefix = agentPrefixInput.value || '192.168.1.';
+      managerIP = managerIpInput.value || '192.168.1.1';
+
+      // setup manager visual node
+      mapManager.baseClass = 'w-24 h-24 rounded-full flex flex-col items-center justify-center text-center font-bold shadow-md transition-all duration-150 bg-white text-black border-2 border-gray-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+      mapManager.className = mapManager.baseClass;
+      mapManager.innerHTML = `Manager<br><span class="text-xs font-normal">${managerIP}</span>`;
+
+      devices.clear();
+      deviceGrid.innerHTML = '';
+      mapAgentsContainer.innerHTML = '';
+      stopPolling();
+
+      const totalDevices = deviceSetupList.reduce((acc, item) => acc + item.count, 0);
+      if (totalDevices === 0) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Error: Device list is empty. Add devices first.');
+        return;
+      }
+      if (totalDevices > 100) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Error: Cannot create more than 100 devices.');
+        return;
+      }
+
+      let currentIndex = 0;
+      for (const item of deviceSetupList) {
+        for (let i = 0; i < item.count; i++) {
+          const ip = `${prefix}${100 + currentIndex + 1}`;
+          const type = item.type;
+          const device = new Device(ip, type);
+          devices.set(ip, device);
+
+          updateDeviceGrid(device);
+          updateNetworkMap(device, currentIndex, totalDevices);
+          currentIndex++;
+        }
+      }
+
+      logMessage('SYSTEM', 'Manager', 'Manager', `Created ${totalDevices} devices.`);
+      startPollBtn.disabled = false;
+      sendSetBtn.disabled = false;
+    });
+
+    startPollBtn.addEventListener('click', startPolling);
+    stopPollBtn.addEventListener('click', stopPolling);
+
+    sendSetBtn.addEventListener('click', () => {
+      const ip = setIpInput.value.trim();
+      const oid = setOidInput.value.trim();
+      const value = setValueInput.value;
+      const device = devices.get(ip);
+
+      if (!device) {
+        logMessage('SYSTEM', 'Manager', 'Manager', `Error: Device with IP ${ip} not found.`);
+        return;
+      }
+      if (!oid || !value) {
+        logMessage('SYSTEM', 'Manager', 'Manager', 'Error: OID and Value must be specified for SET.');
+        return;
+      }
+
+      const delay = getNetworkDelay();
+      logMessage('SET', managerIP, ip, `Request: ${oid} = ${value}`);
+      flashMapElement(ip, 'set');
+
+      setTimeout(() => {
+        const response = device.set(oid, value);
+        logMessage('SET-RESPONSE', ip, managerIP, `Response: ${response}`);
+      }, delay);
+    });
+
+    clearLogBtn.addEventListener('click', () => {
+      logOutput.innerHTML = '';
+      logMessage('SYSTEM', 'Manager', 'Manager', 'Log cleared.');
+    });
+
+    downloadSetupBtn.addEventListener('click', downloadDeviceSetup);
+    downloadFullLogBtn.addEventListener('click', () => downloadLog(false));
+    downloadFilteredLogBtn.addEventListener('click', () => downloadLog(true));
+
+    renderDeviceList();
+  </script>
+</body>
+</html>
